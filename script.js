@@ -1,204 +1,185 @@
-
-const API_URL = "http://127.0.0.1:8000/recommend";
+const API_URL = "http://127.0.0.1:8000/explain";
 
 document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("inpForm");
-    const resultDiv = document.getElementById("result");
-    const submitButton = document.getElementById("formsubmitButton");
+  const form = document.getElementById("inpForm");
+  const resultDiv = document.getElementById("result");
+  const submitButton = document.getElementById("formsubmitButton");
 
-    // --------------------------------
-    // SLIDER VALUE DISPLAY
-    // --------------------------------
+  // --------------------------------
+  // SLIDER VALUE DISPLAY
+  // --------------------------------
 
-    const sliders = [
-        {
-            input: "avgDailyHours",
-            display: "avgDailyHoursValue",
-            suffix: " hrs"
-        },
-        {
-            input: "studyhours",
-            display: "studyhoursValue",
-            suffix: " hours"
-        },
-        {
-            input: "physActiviyHours",
-            display: "physActiviyHoursValue",
-            suffix: " hours"
-        },
-        {
-            input: "sleepHours",
-            display: "sleepHoursValue",
-            suffix: " hours"
-        }
-    ];
+  const sliders = [
+    {
+      input: "avgDailyHours",
+      display: "avgDailyHoursValue",
+      suffix: " hrs",
+    },
+    {
+      input: "studyhours",
+      display: "studyhoursValue",
+      suffix: " hours",
+    },
+    {
+      input: "physActiviyHours",
+      display: "physActiviyHoursValue",
+      suffix: " hours",
+    },
+    {
+      input: "sleepHours",
+      display: "sleepHoursValue",
+      suffix: " hours",
+    },
+  ];
 
-    sliders.forEach((item) => {
-        const input = document.getElementById(item.input);
-        const display = document.getElementById(item.display);
+  sliders.forEach((item) => {
+    const input = document.getElementById(item.input);
+    const display = document.getElementById(item.display);
 
-        if (input && display) {
-            const updateValue = () => {
-                display.textContent =
-                    Number(input.value).toFixed(1) + item.suffix;
-            };
+    if (input && display) {
+      const updateValue = () => {
+        display.textContent = Number(input.value).toFixed(1) + item.suffix;
+      };
 
-            updateValue();
-            input.addEventListener("input", updateValue);
-        }
+      updateValue();
+
+      input.addEventListener("input", updateValue);
+    }
+  });
+
+  // --------------------------------
+  // COLLECT FORM DATA
+  // --------------------------------
+
+  function getFormData() {
+    return {
+      age: Number(document.getElementById("age").value),
+
+      gender: document.getElementById("gender").value,
+
+      country: document.getElementById("countryInp").value.trim(),
+
+      academic_level: document.getElementById("acadlevel").value,
+
+      most_used_platform: document.getElementById("mostusedplat").value,
+
+      purpose_of_use: document.getElementById("mainpurp").value,
+
+      avg_daily_usage_hours: Number(
+        document.getElementById("avgDailyHours").value,
+      ),
+
+      daily_unlocks: Number(document.getElementById("unlocks").value),
+
+      study_hours: Number(document.getElementById("studyhours").value),
+
+      physical_activity_hours: Number(
+        document.getElementById("physActiviyHours").value,
+      ),
+
+      sleep_hours_per_night: Number(
+        document.getElementById("sleepHours").value,
+      ),
+
+      stress_level: document.getElementById("stresslevel").value,
+    };
+  }
+
+  // --------------------------------
+  // FORMAT FEATURE NAMES
+  // --------------------------------
+
+  function formatFeatureName(feature) {
+    if (feature.startsWith("Grouped_Countries_")) {
+      return "Country Group: " + feature.replace("Grouped_Countries_", "");
+    }
+
+    if (feature.startsWith("Purpose_Of_Use_")) {
+      return "Purpose: " + feature.replace("Purpose_Of_Use_", "");
+    }
+
+    if (feature.startsWith("Most_Used_Platform_")) {
+      return "Platform: " + feature.replace("Most_Used_Platform_", "");
+    }
+
+    if (feature.startsWith("Gender_")) {
+      return "Gender: " + feature.replace("Gender_", "");
+    }
+
+    if (feature.startsWith("Academic_Level_")) {
+      return "Academic Level: " + feature.replace("Academic_Level_", "");
+    }
+
+    return feature.replaceAll("_", " ");
+  }
+
+  // --------------------------------
+  // FORMAT NUMBERS
+  // --------------------------------
+
+  function formatNumber(value) {
+    return Number(value).toFixed(3);
+  }
+
+  // --------------------------------
+  // PREVENT HTML INJECTION
+  // --------------------------------
+
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      };
+
+      return entities[character];
     });
+  }
 
-    // --------------------------------
-    // COLLECT FORM DATA
-    // --------------------------------
+  // --------------------------------
+  // DISPLAY SHAP RESULTS
+  // --------------------------------
 
-    function getFormData() {
-        return {
-            age: Number(document.getElementById("age").value),
+  function displayResults(data) {
+    const predictedScore = Number(data.predicted_score);
+    const baseline = Number(data.baseline);
+    const features = data.top_features;
 
-            gender: document.getElementById("gender").value,
-
-            country: document.getElementById("countryInp").value.trim(),
-
-            academic_level: document.getElementById("acadlevel").value,
-
-            most_used_platform: document.getElementById("mostusedplat").value,
-
-            purpose_of_use: document.getElementById("mainpurp").value,
-
-            avg_daily_usage_hours: Number(
-                document.getElementById("avgDailyHours").value
-            ),
-
-            daily_unlocks: Number(
-                document.getElementById("unlocks").value
-            ),
-
-            study_hours: Number(
-                document.getElementById("studyhours").value
-            ),
-
-            physical_activity_hours: Number(
-                document.getElementById("physActiviyHours").value
-            ),
-
-            sleep_hours_per_night: Number(
-                document.getElementById("sleepHours").value
-            ),
-
-            stress_level: document.getElementById("stresslevel").value
-        };
+    if (
+      !Number.isFinite(predictedScore) ||
+      !Number.isFinite(baseline) ||
+      !Array.isArray(features)
+    ) {
+      throw new Error("Invalid response received from the backend.");
     }
 
-    // --------------------------------
-    // FORMAT FEATURE NAMES
-    // --------------------------------
+    const difference = predictedScore - baseline;
 
-    function formatFeatureName(feature) {
-        if (feature.startsWith("Grouped_Countries_")) {
-            return "Country Group: " +
-                feature.replace("Grouped_Countries_", "");
+    const maxContribution = Math.max(
+      ...features.map((feature) => Math.abs(Number(feature.contribution) || 0)),
+      0.000001,
+    );
+
+    const featureHTML = features
+      .map((feature) => {
+        const contribution = Number(feature.contribution);
+
+        if (!Number.isFinite(contribution)) {
+          throw new Error("Invalid SHAP contribution received.");
         }
 
-        if (feature.startsWith("Purpose_Of_Use_")) {
-            return "Purpose: " +
-                feature.replace("Purpose_Of_Use_", "");
-        }
+        const isPositive = contribution >= 0;
 
-        if (feature.startsWith("Most_Used_Platform_")) {
-            return "Platform: " +
-                feature.replace("Most_Used_Platform_", "");
-        }
+        const contributionClass = isPositive ? "positive" : "negative";
 
-        if (feature.startsWith("Gender_")) {
-            return "Gender: " +
-                feature.replace("Gender_", "");
-        }
+        const barWidth = (Math.abs(contribution) / maxContribution) * 100;
 
-        if (feature.startsWith("Academic_Level_")) {
-            return "Academic Level: " +
-                feature.replace("Academic_Level_", "");
-        }
+        const sign = isPositive ? "+" : "";
 
-        return feature.replaceAll("_", " ");
-    }
-
-    // --------------------------------
-    // FORMAT NUMBERS
-    // --------------------------------
-
-    function formatNumber(value) {
-        return Number(value).toFixed(3);
-    }
-
-    // --------------------------------
-    // PREVENT HTML INJECTION
-    // --------------------------------
-
-    function escapeHTML(value) {
-        return String(value).replace(/[&<>"']/g, (character) => {
-            const entities = {
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            };
-
-            return entities[character];
-        });
-    }
-
-    // --------------------------------
-    // DISPLAY SHAP + GEMINI RESULTS
-    // --------------------------------
-
-    function displayResults(data) {
-        const predictedScore = Number(data.predicted_score);
-        const baseline = Number(data.baseline);
-        const features = data.top_features;
-
-        if (
-            !Number.isFinite(predictedScore) ||
-            !Number.isFinite(baseline) ||
-            !Array.isArray(features)
-        ) {
-            throw new Error(
-                "Invalid prediction or SHAP response received from backend."
-            );
-        }
-
-        const difference = predictedScore - baseline;
-
-        // --------------------------------
-        // SHAP FEATURE BARS
-        // --------------------------------
-
-        const maxContribution = Math.max(
-            ...features.map((feature) =>
-                Math.abs(Number(feature.contribution) || 0)
-            ),
-            0.000001
-        );
-
-        const featureHTML = features.map((feature) => {
-            const contribution = Number(feature.contribution);
-
-            if (!Number.isFinite(contribution)) {
-                throw new Error("Invalid SHAP contribution received.");
-            }
-
-            const isPositive = contribution >= 0;
-
-            const contributionClass =
-                isPositive ? "positive" : "negative";
-
-            const barWidth =
-                (Math.abs(contribution) / maxContribution) * 100;
-
-            const sign = isPositive ? "+" : "";
-
-            return `
+        return `
                 <div class="feature-row">
 
                     <div class="feature-info">
@@ -224,48 +205,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 </div>
             `;
-        }).join("");
+      })
+      .join("");
 
-        // --------------------------------
-        // GEMINI RECOMMENDATIONS
-        // --------------------------------
+    // --------------------------------
+    // RESULT HTML
+    // --------------------------------
 
-        const recommendations = Array.isArray(data.recommendations)
-            ? data.recommendations
-            : [];
-
-        const recommendationSource =
-            data.recommendation_source === "gemini"
-                ? "Gemini AI"
-                : "Fallback recommendations";
-
-        const recommendationClass =
-            data.recommendation_source === "gemini"
-                ? "gemini"
-                : "fallback";
-
-        const recommendationHTML = recommendations.length > 0
-            ? recommendations.map((recommendation) => `
-                <li>
-                    ${escapeHTML(recommendation)}
-                </li>
-            `).join("")
-            : `
-                <li>
-                    No recommendations are available right now.
-                    Please try again later.
-                </li>
-            `;
-
-        const recommendationMessage = data.recommendation_message
-            ? escapeHTML(data.recommendation_message)
-            : "";
-
-        // --------------------------------
-        // COMPLETE RESULT HTML
-        // --------------------------------
-
-        resultDiv.innerHTML = `
+    resultDiv.innerHTML = `
 
             <div class="result-heading">
 
@@ -318,8 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
 
                     <div class="summary-value">
-                        ${difference >= 0 ? "+" : ""}
-                        ${formatNumber(difference)}
+                        ${difference >= 0 ? "+" : ""}${formatNumber(difference)}
                     </div>
 
                 </div>
@@ -335,6 +281,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     These are the top ${features.length} features
                     that contributed to your individual prediction.
                 </p>
+
 
                 <div class="feature-list">
 
@@ -367,39 +314,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
 
 
-            <!-- PERSONALIZED RECOMMENDATIONS -->
-
-            <div class="recommendation-section">
-
-                <div class="recommendation-heading">
-
-                    <h3>Your Personalized Recommendations</h3>
-
-                    <span class="recommendation-source ${recommendationClass}">
-                        ${escapeHTML(recommendationSource)}
-                    </span>
-
-                </div>
-
-                <p class="recommendation-description">
-                    Based on your responses and the factors
-                    influencing your prediction, here are some
-                    suggestions to help you maintain a balanced routine.
-                </p>
-
-                <ul class="recommendation-list">
-                    ${recommendationHTML}
-                </ul>
-
-                <p class="recommendation-message">
-                    ${recommendationMessage}
-                </p>
-
-            </div>
-
-
-            <!-- EXPLANATION AND DISCLAIMER -->
-
             <div class="result-note">
 
                 <strong>How to read this analysis:</strong>
@@ -421,75 +335,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
         `;
 
-        resultDiv.style.display = "block";
+    resultDiv.style.display = "block";
 
-        resultDiv.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    }
+    resultDiv.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 
-    // --------------------------------
-    // FORM SUBMISSION
-    // --------------------------------
+  // --------------------------------
+  // FORM SUBMISSION
+  // --------------------------------
 
-    if (form) {
-        form.addEventListener("submit", async (event) => {
-            event.preventDefault();
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
-            resultDiv.style.display = "block";
+      resultDiv.style.display = "block";
 
-            resultDiv.innerHTML = `
+      resultDiv.innerHTML = `
                 <div class="loading-message">
                     <h3>Analyzing your responses...</h3>
-                    <p>
-                        Please wait while Unplug generates your
-                        prediction, explanation and recommendations.
-                    </p>
+                    <p>Please wait while Unplug generates your explanation.</p>
                 </div>
             `;
 
-            submitButton.disabled = true;
-            submitButton.textContent = "Analyzing...";
+      submitButton.disabled = true;
+      submitButton.textContent = "Analyzing...";
 
-            try {
-                const formData = getFormData();
+      try {
+        const formData = getFormData();
 
-                console.log("Sending data:", formData);
+        console.log("Sending data:", formData);
 
-                const response = await fetch(API_URL, {
-                    method: "POST",
+        const response = await fetch(API_URL, {
+          method: "POST",
 
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-                    body: JSON.stringify(formData)
-                });
+          body: JSON.stringify(formData),
+        });
 
-                const data = await response.json();
+        const data = await response.json();
 
-                if (!response.ok) {
-                    const errorMessage =
-                        data.detail || "Unable to generate recommendations.";
+        if (!response.ok) {
+          const errorMessage = data.detail || "Unable to generate prediction.";
 
-                    throw new Error(
-                        typeof errorMessage === "string"
-                            ? errorMessage
-                            : JSON.stringify(errorMessage)
-                    );
-                }
+          throw new Error(
+            typeof errorMessage === "string"
+              ? errorMessage
+              : JSON.stringify(errorMessage),
+          );
+        }
 
-                console.log("Complete recommendation response:", data);
+        console.log("SHAP response:", data);
 
-                displayResults(data);
+        displayResults(data);
+      } catch (error) {
+        console.error("Prediction error:", error);
 
-            } catch (error) {
-                console.error("Recommendation error:", error);
+        resultDiv.style.display = "block";
 
-                resultDiv.style.display = "block";
-
-                resultDiv.innerHTML = `
+        resultDiv.innerHTML = `
                     <div class="result-error">
 
                         <h3>Something went wrong!</h3>
@@ -506,15 +415,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
 
-                resultDiv.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center"
-                });
-
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = "Get My Score";
-            }
+        resultDiv.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
         });
-    }
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "Get My Score";
+      }
+    });
+  }
 });
