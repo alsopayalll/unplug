@@ -96,13 +96,15 @@ def explain_prediction(user_data):
     }
 
 #testing
-test_user = df.iloc[100].to_dict()
+if __name__ == "__main__":
+    test_user = df.iloc[100].to_dict()
 
-result = explain_prediction(test_user)
+    result = explain_prediction(test_user)
 
-print("\nPrediction:", result["predicted_score"])
-print("Baseline:", result["baseline"])
-print("\nTop influencing features:")
+    print("\nPrediction:", result["predicted_score"])
+    print("Baseline:", result["baseline"])
 
-for feature in result["top_features"]:
-    print(feature)
+    print("\nTop influencing features:")
+
+    for feature in result["top_features"]:
+        print(feature)
