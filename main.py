@@ -8,23 +8,53 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Literal
 
+from shapExplainer import explain_prediction
+
+
+# ==========================================
+# LOAD MODEL
+# ==========================================
+
 BASE_DIR = Path(__file__).resolve().parent
 
-model = joblib.load(BASE_DIR / "Mental_Health_Model.pkl")
+model = joblib.load(
+    BASE_DIR / "Mental_Health_Model.pkl"
+)
+
 
 top_countries = [
-    'Other', 'India', 'USA', 'Canada', 'Australia',
-    'UK', 'Germany', 'Mexico', 'Turkey', 'France'
+    'Other',
+    'India',
+    'USA',
+    'Canada',
+    'Australia',
+    'UK',
+    'Germany',
+    'Mexico',
+    'Turkey',
+    'France'
 ]
 
-app = FastAPI(title="Unplug - Mental Health Prediction API")
+
+# ==========================================
+# FASTAPI APP
+# ==========================================
+
+app = FastAPI(
+    title="Unplug - Mental Health Prediction API"
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict this before production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==========================================
+# INPUT MODEL
+# ==========================================
 
 class StudentData(BaseModel):
 
@@ -35,44 +65,90 @@ class StudentData(BaseModel):
     country: str
 
     academic_level: Literal[
-        'Undergraduate', 'Graduate', 'High School'
+        'Undergraduate',
+        'Graduate',
+        'High School'
     ]
 
     most_used_platform: Literal[
-        'Facebook', 'LinkedIn', 'Instagram', 'Snapchat',
-        'Twitter', 'YouTube', 'TikTok', 'LINE',
-        'KakaoTalk', 'VKontakte', 'WhatsApp', 'WeChat'
+        'Facebook',
+        'LinkedIn',
+        'Instagram',
+        'Snapchat',
+        'Twitter',
+        'YouTube',
+        'TikTok',
+        'LINE',
+        'KakaoTalk',
+        'VKontakte',
+        'WhatsApp',
+        'WeChat'
     ]
 
     purpose_of_use: Literal[
-        'Networking', 'Education', 'Entertainment', 'News'
+        'Networking',
+        'Education',
+        'Entertainment',
+        'News'
     ]
 
-    avg_daily_usage_hours: float = Field(..., ge=0, le=24)
+    avg_daily_usage_hours: float = Field(
+        ..., ge=0, le=24
+    )
 
-    daily_unlocks: int = Field(..., ge=0)
+    daily_unlocks: int = Field(
+        ..., ge=0
+    )
 
-    study_hours: float = Field(..., ge=0, le=24)
+    study_hours: float = Field(
+        ..., ge=0, le=24
+    )
 
-    physical_activity_hours: float = Field(..., ge=0, le=24)
+    physical_activity_hours: float = Field(
+        ..., ge=0, le=24
+    )
 
-    sleep_hours_per_night: float = Field(..., ge=0, le=24)
+    sleep_hours_per_night: float = Field(
+        ..., ge=0, le=24
+    )
 
     stress_level: Literal[
-        'Medium', 'Low', 'Very High', 'High'
+        'Medium',
+        'Low',
+        'Very High',
+        'High'
     ]
 
 
+# ==========================================
+# RESPONSE MODEL
+# ==========================================
+
 class PredictionResponse(BaseModel):
+
     predicted_score: float
+
+
+# ==========================================
+# HOME ROUTE
+# ==========================================
 
 @app.get("/")
 def home():
+
     return {
         "message": "Unplug Mental Health Prediction API is running"
     }
 
-@app.post("/predict", response_model=PredictionResponse)
+
+# ==========================================
+# EXISTING PREDICTION API
+# ==========================================
+
+@app.post(
+    "/predict",
+    response_model=PredictionResponse
+)
 def predict(data: StudentData):
 
     # Group countries
@@ -102,8 +178,52 @@ def predict(data: StudentData):
     }])
 
     # Generate prediction
-    prediction = float(model.predict(input_rows)[0])
+    prediction = float(
+        model.predict(input_rows)[0]
+    )
 
     return PredictionResponse(
         predicted_score=prediction
     )
+
+
+# ==========================================
+# NEW SHAP EXPLANATION API
+# ==========================================
+
+@app.post("/explain")
+def explain(data: StudentData):
+
+    # Convert validated Pydantic data into dictionary
+    user_data = {
+
+        "Age": data.age,
+
+        "Gender": data.gender,
+
+        "Country": data.country,
+
+        "Academic_Level": data.academic_level,
+
+        "Most_Used_Platform": data.most_used_platform,
+
+        "Purpose_Of_Use": data.purpose_of_use,
+
+        "Avg_Daily_Usage_Hours": data.avg_daily_usage_hours,
+
+        "Daily_Unlocks": data.daily_unlocks,
+
+        "Study_Hours": data.study_hours,
+
+        "Physical_Activity_Hours": data.physical_activity_hours,
+
+        "Sleep_Hours_Per_Night": data.sleep_hours_per_night,
+
+        "Stress_Level": data.stress_level
+
+    }
+
+    # Generate SHAP explanation
+    result = explain_prediction(user_data)
+
+    return result
