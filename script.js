@@ -1,259 +1,428 @@
-const API = "http://127.0.0.1:8000/predict";
+const API_URL = "http://127.0.0.1:8000/explain";
 
-const form = document.getElementById("inpForm");
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("inpForm");
+  const resultDiv = document.getElementById("result");
+  const submitButton = document.getElementById("formsubmitButton");
 
-const age = document.getElementById("age");
-const gender = document.getElementById("gender");
-const country = document.getElementById("countryInp");
-const academic = document.getElementById("acadlevel");
+  // --------------------------------
+  // SLIDER VALUE DISPLAY
+  // --------------------------------
 
-const mostUsedPlatform = document.getElementById("mostusedplat");
-const mainPurpose = document.getElementById("mainpurp");
+  const sliders = [
+    {
+      input: "avgDailyHours",
+      display: "avgDailyHoursValue",
+      suffix: " hrs",
+    },
+    {
+      input: "studyhours",
+      display: "studyhoursValue",
+      suffix: " hours",
+    },
+    {
+      input: "physActiviyHours",
+      display: "physActiviyHoursValue",
+      suffix: " hours",
+    },
+    {
+      input: "sleepHours",
+      display: "sleepHoursValue",
+      suffix: " hours",
+    },
+  ];
 
-const avgDailyHours = document.getElementById("avgDailyHours");
-const unlocks = document.getElementById("unlocks");
+  sliders.forEach((item) => {
+    const input = document.getElementById(item.input);
+    const display = document.getElementById(item.display);
 
-const studyHours = document.getElementById("studyhours");
-const physicalActivityHours = document.getElementById("physActiviyHours");
-const sleepHours = document.getElementById("sleepHours");
+    if (input && display) {
+      const updateValue = () => {
+        display.textContent = Number(input.value).toFixed(1) + item.suffix;
+      };
 
-const stressLevel = document.getElementById("stresslevel");
+      updateValue();
 
-const submitButton = document.getElementById("formsubmitButton");
+      input.addEventListener("input", updateValue);
+    }
+  });
 
-const resultBox = document.getElementById("result");
+  // --------------------------------
+  // COLLECT FORM DATA
+  // --------------------------------
 
+  function getFormData() {
+    return {
+      age: Number(document.getElementById("age").value),
 
-// Slider value display elements
-const avgDailyHoursValue = document.getElementById("avgDailyHoursValue");
-const studyHoursValue = document.getElementById("studyhoursValue");
-const physicalActivityHoursValue = document.getElementById("physActiviyHoursValue");
-const sleepHoursValue = document.getElementById("sleepHoursValue");
+      gender: document.getElementById("gender").value,
 
-function updateSliderValue(slider, display, unit) {
+      country: document.getElementById("countryInp").value.trim(),
 
-    display.textContent = `${Number(slider.value).toFixed(1)} ${unit}`;
+      academic_level: document.getElementById("acadlevel").value,
 
-}
+      most_used_platform: document.getElementById("mostusedplat").value,
 
-avgDailyHours.addEventListener("input", function () {
+      purpose_of_use: document.getElementById("mainpurp").value,
 
-    updateSliderValue(avgDailyHours, avgDailyHoursValue, "hrs");
+      avg_daily_usage_hours: Number(
+        document.getElementById("avgDailyHours").value,
+      ),
 
-});
+      daily_unlocks: Number(document.getElementById("unlocks").value),
 
-studyHours.addEventListener("input", function () {
+      study_hours: Number(document.getElementById("studyhours").value),
 
-    updateSliderValue(studyHours, studyHoursValue, "hours");
+      physical_activity_hours: Number(
+        document.getElementById("physActiviyHours").value,
+      ),
 
-});
+      sleep_hours_per_night: Number(
+        document.getElementById("sleepHours").value,
+      ),
 
-physicalActivityHours.addEventListener("input", function () {
-
-    updateSliderValue(
-        physicalActivityHours,
-        physicalActivityHoursValue,
-        "hours"
-    );
-
-});
-
-sleepHours.addEventListener("input", function () {
-
-    updateSliderValue(sleepHours, sleepHoursValue, "hours");
-
-});
-
-function normalizeCountry(value) {
-
-    const countryMap = {
-        "united states": "USA",
-        "united states of america": "USA",
-        "us": "USA",
-
-        "united kingdom": "UK",
-        "great britain": "UK",
-
-        "india": "India",
-        "canada": "Canada",
-        "australia": "Australia",
-        "germany": "Germany",
-        "mexico": "Mexico",
-        "turkey": "Turkey",
-        "france": "France"
+      stress_level: document.getElementById("stresslevel").value,
     };
+  }
 
-    const cleanedCountry = value.trim();
+  // --------------------------------
+  // FORMAT FEATURE NAMES
+  // --------------------------------
 
-    return countryMap[cleanedCountry.toLowerCase()] || cleanedCountry;
-
-}
-
-function showResult(score) {
-
-    resultBox.replaceChildren();
-
-    const heading = document.createElement("h2");
-    heading.textContent = "Your Predicted Score";
-
-    const scoreText = document.createElement("p");
-    scoreText.textContent = Number(score).toFixed(2);
-
-    const message = document.createElement("p");
-    message.textContent =
-        "This is a model-generated prediction based on the information you provided. It is not a medical diagnosis.";
-
-    resultBox.appendChild(heading);
-    resultBox.appendChild(scoreText);
-    resultBox.appendChild(message);
-
-    resultBox.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
-
-}
-
-function showError(message) {
-
-    resultBox.replaceChildren();
-
-    const errorHeading = document.createElement("h3");
-    errorHeading.textContent = "Something went wrong";
-
-    const errorText = document.createElement("p");
-    errorText.textContent = message;
-
-    resultBox.appendChild(errorHeading);
-    resultBox.appendChild(errorText);
-
-    resultBox.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
-
-}
-
-form.addEventListener("submit", async function (event) {
-
-    // Prevent page refresh
-    event.preventDefault();
-
-    // Check browser form validation
-    if (!form.reportValidity()) {
-        return;
+  function formatFeatureName(feature) {
+    if (feature.startsWith("Grouped_Countries_")) {
+      return "Country Group: " + feature.replace("Grouped_Countries_", "");
     }
 
-    // Clear previous result
-    resultBox.replaceChildren();
+    if (feature.startsWith("Purpose_Of_Use_")) {
+      return "Purpose: " + feature.replace("Purpose_Of_Use_", "");
+    }
 
-    submitButton.disabled = true;
-    submitButton.textContent = "Calculating...";
+    if (feature.startsWith("Most_Used_Platform_")) {
+      return "Platform: " + feature.replace("Most_Used_Platform_", "");
+    }
 
-    const inputData = {
+    if (feature.startsWith("Gender_")) {
+      return "Gender: " + feature.replace("Gender_", "");
+    }
 
-        age: Number(age.value),
+    if (feature.startsWith("Academic_Level_")) {
+      return "Academic Level: " + feature.replace("Academic_Level_", "");
+    }
 
-        gender: gender.value,
+    return feature.replaceAll("_", " ");
+  }
 
-        country: normalizeCountry(country.value),
+  // --------------------------------
+  // FORMAT NUMBERS
+  // --------------------------------
 
-        academic_level: academic.value,
+  function formatNumber(value) {
+    return Number(value).toFixed(3);
+  }
 
-        most_used_platform: mostUsedPlatform.value,
+  // --------------------------------
+  // PREVENT HTML INJECTION
+  // --------------------------------
 
-        purpose_of_use: mainPurpose.value,
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      };
 
-        avg_daily_usage_hours: Number(avgDailyHours.value),
+      return entities[character];
+    });
+  }
 
-        daily_unlocks: Number(unlocks.value),
+  // --------------------------------
+  // DISPLAY SHAP RESULTS
+  // --------------------------------
 
-        study_hours: Number(studyHours.value),
+  function displayResults(data) {
+    const predictedScore = Number(data.predicted_score);
+    const baseline = Number(data.baseline);
+    const features = data.top_features;
 
-        physical_activity_hours: Number(physicalActivityHours.value),
+    if (
+      !Number.isFinite(predictedScore) ||
+      !Number.isFinite(baseline) ||
+      !Array.isArray(features)
+    ) {
+      throw new Error("Invalid response received from the backend.");
+    }
 
-        sleep_hours_per_night: Number(sleepHours.value),
+    const difference = predictedScore - baseline;
 
-        stress_level: stressLevel.value
+    const maxContribution = Math.max(
+      ...features.map((feature) => Math.abs(Number(feature.contribution) || 0)),
+      0.000001,
+    );
 
-    };
+    const featureHTML = features
+      .map((feature) => {
+        const contribution = Number(feature.contribution);
+
+        if (!Number.isFinite(contribution)) {
+          throw new Error("Invalid SHAP contribution received.");
+        }
+
+        const isPositive = contribution >= 0;
+
+        const contributionClass = isPositive ? "positive" : "negative";
+
+        const barWidth = (Math.abs(contribution) / maxContribution) * 100;
+
+        const sign = isPositive ? "+" : "";
+
+        return `
+                <div class="feature-row">
+
+                    <div class="feature-info">
+
+                        <span class="feature-name">
+                            ${escapeHTML(formatFeatureName(feature.feature))}
+                        </span>
+
+                        <span class="feature-value ${contributionClass}">
+                            ${sign}${formatNumber(contribution)}
+                        </span>
+
+                    </div>
+
+                    <div class="feature-bar-track">
+
+                        <div
+                            class="feature-bar-fill ${contributionClass}"
+                            style="width: ${barWidth}%">
+                        </div>
+
+                    </div>
+
+                </div>
+            `;
+      })
+      .join("");
+
+    // --------------------------------
+    // RESULT HTML
+    // --------------------------------
+
+    resultDiv.innerHTML = `
+
+            <div class="result-heading">
+
+                <h2>Your <span>Unplug</span> Analysis</h2>
+
+                <p>
+                    Here's what our machine learning model found
+                    from your responses.
+                </p>
+
+            </div>
 
 
-    console.log("Data being sent to backend:", inputData);
+            <div class="result-score">
 
-    try {
+                <div class="score-label">
+                    Predicted Mental Health Score
+                </div>
 
-        const response = await fetch(API, {
+                <div class="score-number">
+                    ${formatNumber(predictedScore)}
+                </div>
 
-            method: "POST",
+                <div class="score-label">
+                    Model prediction
+                </div>
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+            </div>
 
-            body: JSON.stringify(inputData)
 
+            <div class="result-summary">
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Baseline Score
+                    </div>
+
+                    <div class="summary-value">
+                        ${formatNumber(baseline)}
+                    </div>
+
+                </div>
+
+
+                <div class="summary-card">
+
+                    <div class="summary-label">
+                        Difference from Baseline
+                    </div>
+
+                    <div class="summary-value">
+                        ${difference >= 0 ? "+" : ""}${formatNumber(difference)}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="feature-section">
+
+                <h3>What influenced your prediction?</h3>
+
+                <p class="feature-description">
+                    These are the top ${features.length} features
+                    that contributed to your individual prediction.
+                </p>
+
+
+                <div class="feature-list">
+
+                    ${featureHTML}
+
+                </div>
+
+
+                <div class="result-legend">
+
+                    <div class="legend-item">
+
+                        <span class="legend-dot positive"></span>
+
+                        Pushes prediction higher
+
+                    </div>
+
+
+                    <div class="legend-item">
+
+                        <span class="legend-dot negative"></span>
+
+                        Pushes prediction lower
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="result-note">
+
+                <strong>How to read this analysis:</strong>
+
+                SHAP values explain how individual features influence
+                the model's prediction compared with its baseline.
+                Positive contributions push the prediction higher,
+                while negative contributions push it lower.
+
+                <br><br>
+
+                <strong>Disclaimer:</strong>
+
+                This is an AI-based prediction for educational purposes.
+                It is not a medical diagnosis or a substitute for
+                professional mental health support.
+
+            </div>
+
+        `;
+
+    resultDiv.style.display = "block";
+
+    resultDiv.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  // --------------------------------
+  // FORM SUBMISSION
+  // --------------------------------
+
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      resultDiv.style.display = "block";
+
+      resultDiv.innerHTML = `
+                <div class="loading-message">
+                    <h3>Analyzing your responses...</h3>
+                    <p>Please wait while Unplug generates your explanation.</p>
+                </div>
+            `;
+
+      submitButton.disabled = true;
+      submitButton.textContent = "Analyzing...";
+
+      try {
+        const formData = getFormData();
+
+        console.log("Sending data:", formData);
+
+        const response = await fetch(API_URL, {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify(formData),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
+          const errorMessage = data.detail || "Unable to generate prediction.";
 
-            let errorMessage = "Unable to generate prediction.";
-
-            if (Array.isArray(data.detail)) {
-
-                errorMessage = data.detail
-                    .map(error => error.msg)
-                    .join(", ");
-
-            } else if (typeof data.detail === "string") {
-
-                errorMessage = data.detail;
-
-            }
-
-            throw new Error(errorMessage);
-
+          throw new Error(
+            typeof errorMessage === "string"
+              ? errorMessage
+              : JSON.stringify(errorMessage),
+          );
         }
 
-        console.log("Prediction received:", data);
+        console.log("SHAP response:", data);
 
-        if (typeof data.predicted_score !== "number") {
-
-            throw new Error("Invalid prediction received from backend.");
-
-        }
-
-        showResult(data.predicted_score);
-
-
-    }
-
-    catch (error) {
-
+        displayResults(data);
+      } catch (error) {
         console.error("Prediction error:", error);
 
-        if (error instanceof TypeError) {
+        resultDiv.style.display = "block";
 
-            showError(
-                "Cannot connect to the backend. Please make sure your FastAPI server is running at http://127.0.0.1:8000."
-            );
+        resultDiv.innerHTML = `
+                    <div class="result-error">
 
-        } else {
+                        <h3>Something went wrong!</h3>
 
-            showError(error.message);
+                        <p>
+                            ${escapeHTML(error.message)}
+                        </p>
 
-        }
+                        <p>
+                            Please check whether your backend server
+                            is running and try again.
+                        </p>
 
-    }
+                    </div>
+                `;
 
-    finally {
-
-        // Enable button again
+        resultDiv.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      } finally {
         submitButton.disabled = false;
-        submitButton.textContent = "Check my score";
-
-    }
-
+        submitButton.textContent = "Get My Score";
+      }
+    });
+  }
 });
